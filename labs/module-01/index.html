@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  Module concept page — lab-visualizer skill.
+
+  COPY this file to labs/module-NN/index.html, then replace the [BRACKETED]
+  placeholders and the `quizData` array with module-specific content.
+
+  Keep the <style> and <script> blocks byte-identical between modules. They
+  carry fixes that are easy to silently reintroduce when a page is written
+  from memory instead of copied:
+
+    * the score readout stays hidden until submit (a live score lets a learner
+      click each option and read the answer off the counter)
+    * .card-body uses grid-template-rows, not max-height, so a tall concept
+      card cannot clip its own content
+    * flow-step animation delays use :nth-of-type, because :nth-child counts
+      the arrow <span>s and lands the delays on the wrong elements
+    * prefers-reduced-motion restores opacity — with animations disabled, a
+      fadeInUp element that starts at opacity:0 never becomes visible
+    * concept headers and quiz options are real focusable controls, so the
+      page is keyboard navigable
+
+  Delete any section the module does not need (comparison, stats, tabs).
+  ===========================================================================
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Module 01: AI Champions Kick-off and Enterprise Context</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-hover: #2980b9;
+            --secondary: #2ecc71;
+            --accent: #e74c3c;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --correct: #22c55e;
+            --incorrect: #ef4444;
+            --neutral: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Visible focus ring on every interactive element. */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ── Hero ─────────────────────────────────── */
+        .hero {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+            padding: 4rem 2rem 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .hero .subtitle { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        /* ── Layout ───────────────────────────────── */
+        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+        /* ── Section Headers ──────────────────────── */
+        .section-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* ── Concept Cards ────────────────────────── */
+        .concept-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .concept-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(52, 152, 219, 0.15);
+        }
+        /* Accordion pattern: the heading wraps the button, so the card is
+           reachable by Tab and toggles on Enter/Space while still appearing
+           in the document outline. A <div onclick> is invisible to keyboard
+           users; a <button> wrapping the <h3> is invalid HTML. */
+        .concept-card .card-heading { margin: 0; font-size: inherit; font-weight: inherit; }
+        .concept-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            user-select: none;
+        }
+        .concept-card .card-title-text { flex: 1; font-size: 1.2rem; font-weight: 600; }
+        .concept-card .toggle-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease;
+            color: var(--primary);
+        }
+        .concept-card.open .toggle-icon { transform: rotate(90deg); }
+
+        /* grid-template-rows animates to the content's natural height, so a
+           card taller than an arbitrary max-height is never clipped. */
+        .concept-card .card-body {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.4s ease;
+        }
+        .concept-card.open .card-body { grid-template-rows: 1fr; }
+        .concept-card .card-body-inner { overflow: hidden; }
+        .concept-card.open .card-body-inner { padding-top: 1.25rem; }
+        .concept-card .definition {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        /* ── Diagram Boxes ────────────────────────── */
+        .diagram-container {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+        .diagram-container svg { max-width: 100%; height: auto; }
+
+        /* ── Animated Flow ────────────────────────── */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        .flow-step {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1.25rem;
+            text-align: center;
+            min-width: 120px;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeInUp 0.4s forwards;
+        }
+        /* :nth-of-type counts <div>s only. :nth-child would count the arrow
+           <span>s too and apply the delays to the wrong elements. */
+        .flow-step:nth-of-type(2) { animation-delay: 0.1s; }
+        .flow-step:nth-of-type(3) { animation-delay: 0.2s; }
+        .flow-step:nth-of-type(4) { animation-delay: 0.3s; }
+        .flow-step:nth-of-type(5) { animation-delay: 0.4s; }
+        .flow-step .step-label { font-size: 0.8rem; color: var(--text-muted); }
+        .flow-step .step-name { font-weight: 600; }
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; animation: pulse 1.5s infinite; }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ── Comparison Table ─────────────────────── */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .comparison .col {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+        }
+        .comparison .col h4 { margin-bottom: 0.75rem; }
+        .comparison .col.pro { border-top: 3px solid var(--correct); }
+        .comparison .col.con { border-top: 3px solid var(--incorrect); }
+        .comparison ul { list-style: none; padding: 0; }
+        .comparison li { padding: 0.35rem 0; padding-left: 1.25rem; position: relative; }
+        .comparison li::before { content: '•'; position: absolute; left: 0; color: var(--primary); }
+
+        /* ── Interactive Code Block ────────────────── */
+        .code-block {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        .code-block .code-header {
+            background: var(--bg);
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre {
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* ── Stats Row ────────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-card .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .stat-card .stat-source {
+            font-size: 0.7rem;
+            color: var(--neutral);
+            margin-top: 0.5rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────── */
+        .tabs { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+        .tab-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.95rem;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .tab-btn[aria-selected="true"] {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .tab-content[hidden] { display: none; }
+
+        /* ── Quiz Section ─────────────────────────── */
+        .quiz-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--accent);
+        }
+        .quiz-header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        .quiz-progress {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .quiz-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+        .quiz-dot.answered { background: var(--primary); }
+        .quiz-dot.correct { background: var(--correct); }
+        .quiz-dot.incorrect { background: var(--incorrect); }
+        .quiz-stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+        .question-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--neutral);
+            transition: border-color 0.3s;
+        }
+        .question-card.correct { border-left-color: var(--correct); }
+        .question-card.incorrect { border-left-color: var(--incorrect); }
+        .question-number { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; padding: 0; }
+        .question-text { font-weight: 500; margin-bottom: 1rem; }
+        .options { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        /* Real radio inputs: arrow keys move within a question, Tab moves
+           between questions, and screen readers announce "2 of 4". */
+        .option {
+            display: block;
+            position: relative;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        .option:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .option:hover:not(.locked) { border-color: var(--primary); background: rgba(52,152,219,0.1); }
+        .option.locked { cursor: not-allowed; }
+        .option.selected { border-color: var(--primary); background: rgba(52,152,219,0.15); }
+        .option.correct { border-color: var(--correct); background: rgba(34,197,94,0.15); }
+        .option.incorrect { border-color: var(--incorrect); background: rgba(239,68,68,0.15); }
+        /* Result marked with a glyph as well as colour (WCAG 1.4.1). */
+        .option .marker { font-weight: 700; }
+        .option.correct .marker::before { content: '\2713\00a0'; color: var(--correct); }
+        .option.incorrect .marker::before { content: '\2717\00a0'; color: var(--incorrect); }
+
+        .feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .feedback[hidden] { display: none; }
+        .feedback.correct { background: rgba(34,197,94,0.1); color: var(--correct); }
+        .feedback.incorrect { background: rgba(239,68,68,0.1); color: var(--incorrect); }
+
+        .quiz-notice {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            background: rgba(231,76,60,0.12);
+            color: #f5a097;
+            font-size: 0.9rem;
+        }
+        .quiz-notice[hidden] { display: none; }
+
+        .quiz-actions { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--surface-hover); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width: 640px) {
+            .hero { padding: 2.5rem 1rem 2rem; }
+            .hero h1 { font-size: 1.75rem; }
+            .container { padding: 1rem; }
+            .comparison { grid-template-columns: 1fr; }
+            .flow { justify-content: center; }
+            .quiz-actions .btn { flex: 1 1 100%; }
+        }
+
+        /* ── Reduced motion ────────────────────────── */
+        /* Without the explicit opacity/transform reset, .flow-step keeps the
+           opacity:0 it starts at and the content is invisible. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .flow-step { opacity: 1; transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- HERO                                        -->
+    <!-- ════════════════════════════════════════════ -->
+    <section class="hero">
+        <h1>Module 01: AI Champions Kick-off &amp; Enterprise Context</h1>
+        <p class="subtitle">Why Honeywell software engineering teams need AI Champions, today's delivery pain points, and the AI-assisted engineering lifecycle this programme builds toward.</p>
+        <span class="badge">Interactive Concept Guide</span>
+    </section>
+
+    <div class="container">
+        <!-- ══════════════════════════════════════════ -->
+        <!-- CONCEPT CARDS                             -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Key Concepts</h2>
+
+        <div class="concept-card open">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="true" aria-controls="concept-1-body">
+                    <span class="card-title-text">1 · Why AI Champions, Why Now</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-1-body">
+                <div class="card-body-inner">
+                    <p class="definition">Today most engineers try Copilot ad hoc, with no shared workflow, prompt-only results that go unverified, and adoption judged by anecdote. An AI Champion drives the shift to a <strong>disciplined, role-based AI-assisted engineering lifecycle</strong> — the same specification-led, test-validated, measured way of working across every function.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">Where teams are</div>
+                            <div class="step-name">Isolated experiments</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">The shift</div>
+                            <div class="step-name">Shared discipline by role</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">The goal</div>
+                            <div class="step-name">Evidence-based adoption</div>
+                        </div>
+                    </div>
+
+                    <p class="definition">The AI Champion is the person in each team who carries that shared workflow, the role expectations, and the success metrics into everyday engineering work — and keeps later modules (Copilot, SDD, testing, MCP, PR quality, observability) building on one foundation.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-2-body">
+                    <span class="card-title-text">2 · The AI-Assisted Software Engineering Lifecycle</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-2-body">
+                <div class="card-body-inner">
+                    <p class="definition">The end-to-end lifecycle the next eleven modules build, one capability at a time. Each stage is measured against the <strong>same</strong> success metrics: implementation cycle time, quality / regression risk, PR review time, testing effort, token usage, and AI cost.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">Stage 1</div>
+                            <div class="step-name">Copilot foundations</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Stage 2</div>
+                            <div class="step-name">Context engineering</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Stage 3</div>
+                            <div class="step-name">Spec-driven development</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Stage 4</div>
+                            <div class="step-name">Test &amp; PR quality</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Stage 5</div>
+                            <div class="step-name">MCP-enabled workflows</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Stage 6</div>
+                            <div class="step-name">Observe, measure, scale</div>
+                        </div>
+                    </div>
+
+                    <p class="definition">Observability is the throughline, not a bolt-on at the end — it connects AI usage to quality, cost, and adoption from the first stage onward.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-3-body">
+                    <span class="card-title-text">3 · Risks of Unmanaged AI &amp; Agent Usage</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-3-body">
+                <div class="card-body-inner">
+                    <p class="definition">The problems this programme exists to solve, grouped by where they show up. Naming the category matters: it decides who owns the fix and which success metric it moves.</p>
+
+                    <div class="comparison">
+                        <div class="col con">
+                            <h4>Business risk</h4>
+                            <ul>
+                                <li>Slow feature and application implementation cycles</li>
+                                <li>Limited visibility into AI usage, quality, and measurable ROI</li>
+                                <li>Inconsistent results when teams rely on prompts alone</li>
+                            </ul>
+                        </div>
+                        <div class="col con">
+                            <h4>Engineering risk</h4>
+                            <ul>
+                                <li>AI-generated changes disrupting brownfield architecture or patterns</li>
+                                <li>Manual, inconsistent PR review creating bottlenecks</li>
+                                <li>Excessive token consumption from weak context discipline</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-4-body">
+                    <span class="card-title-text">4 · Agent Prism: The Monitoring Lens</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-4-body">
+                <div class="card-body-inner">
+                    <p class="definition">Agent Prism is the observability layer introduced on Day 1 so AI adoption is measured against a baseline, not judged by anecdote. One lens, five signals feeding the programme's success metrics.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 560 230" width="560" height="230"
+                             role="img" aria-label="Agent Prism at the centre connects to five monitoring signals: traces and replay, failure patterns, token and cost leakage, quality and control signals, and adoption tracking.">
+                            <line x1="280" y1="70" x2="58"  y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="70" x2="169" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="70" x2="280" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="70" x2="391" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="70" x2="502" y2="150" stroke="#334155" stroke-width="2"/>
+                            <rect x="208" y="24" width="144" height="46" rx="8" fill="#1e3a8a"/>
+                            <text x="280" y="52" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-size="15" font-weight="700">Agent Prism</text>
+                            <g font-family="sans-serif" font-size="11" fill="#e2e8f0" text-anchor="middle">
+                                <rect x="8"   y="150" width="100" height="54" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="58"  y="173">Traces &amp;</text><text x="58" y="189">replay</text>
+                                <rect x="119" y="150" width="100" height="54" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="169" y="173">Failure</text><text x="169" y="189">patterns</text>
+                                <rect x="230" y="150" width="100" height="54" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="280" y="173">Token &amp;</text><text x="280" y="189">cost leakage</text>
+                                <rect x="341" y="150" width="100" height="54" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="391" y="173">Quality &amp;</text><text x="391" y="189">control signals</text>
+                                <rect x="452" y="150" width="100" height="54" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="502" y="173">Adoption</text><text x="502" y="189">tracking</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition">Because these signals map straight onto cycle time, quality, review effort, and cost, participants treat observability as part of engineering — not a separate tooling topic bolted on later.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-5-body">
+                    <span class="card-title-text">5 · The AI Champion Role, By Function</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-5-body">
+                <div class="card-body-inner">
+                    <p class="definition">One shared foundation, then role-specific depth as the programme progresses. Every function is an AI Champion for a different slice of the lifecycle.</p>
+
+                    <div class="comparison">
+                        <div class="col">
+                            <h4>Architects &amp; Engineering Leads</h4>
+                            <ul>
+                                <li>Architecture and dependency analysis, design-principle compliance, and change-impact review across greenfield and brownfield work</li>
+                            </ul>
+                        </div>
+                        <div class="col">
+                            <h4>Developers &amp; Testers</h4>
+                            <ul>
+                                <li>The deepest hands-on Copilot, spec-driven development, and Testcontainers-based test-strategy skill in the programme</li>
+                            </ul>
+                        </div>
+                        <div class="col">
+                            <h4>DevOps &amp; SRE</h4>
+                            <ul>
+                                <li>CI / PR pipelines, MCP tool governance, and connecting Agent Prism telemetry to operational review</li>
+                            </ul>
+                        </div>
+                        <div class="col">
+                            <h4>Product, Program &amp; Design</h4>
+                            <ul>
+                                <li>Studio-style workflows, specification quality, and translating business intent into implementation-ready work</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- VISUAL COMPARISON                         -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Today vs Target State</h2>
+        <p class="definition">The shift this programme is built to drive across every engineering role.</p>
+
+        <div class="comparison">
+            <div class="col con">
+                <h4>❌ Today — isolated experimentation</h4>
+                <ul>
+                    <li>Individual engineers try Copilot ad hoc, with no shared workflow</li>
+                    <li>Prompt-only development, with inconsistent, unverified results</li>
+                    <li>No visibility into token usage, AI cost, or output quality</li>
+                    <li>Brownfield changes risk violating existing architecture unnoticed</li>
+                    <li>AI adoption measured by anecdote, not by evidence</li>
+                </ul>
+            </div>
+            <div class="col pro">
+                <h4>✅ Target — disciplined adoption</h4>
+                <ul>
+                    <li>A common AI-assisted engineering lifecycle, adopted by role</li>
+                    <li>Specification-led development, validated by a proper test strategy</li>
+                    <li>Agent Prism tracks traces, cost, and quality from day one</li>
+                    <li>Change-impact analysis protects existing patterns and contracts</li>
+                    <li>Adoption measured against baselined cycle-time and quality metrics</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- INTERACTIVE TABS                          -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Module 01 in the 12-Module Journey</h2>
+        <p class="definition">This programme is an incremental engineering journey, not a collection of AI tool topics. Every later phase assumes the shared vocabulary, role expectations, and success metrics this session establishes.</p>
+
+        <div class="tabs" role="tablist" aria-label="Programme phases">
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-1"
+                    aria-selected="true" aria-controls="tab-1">Foundation · M1–3</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-2"
+                    aria-selected="false" aria-controls="tab-2">Build &amp; Validate · M4–8</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-3"
+                    aria-selected="false" aria-controls="tab-3">Scale &amp; Govern · M9–11</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-4"
+                    aria-selected="false" aria-controls="tab-4">Capstone · M12</button>
+        </div>
+
+        <div id="tab-1" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-1" tabindex="0">
+            <p><strong>Module 01 — AI Champions Kick-off &amp; Enterprise Context</strong> (you are here): shared vocabulary, role-based expectations, risk framing, and a drafted target-state workflow with baseline success metrics.</p>
+            <p><strong>Module 02 — GitHub Copilot Enterprise Features &amp; Engineering Workflows:</strong> hands-on with chat, inline assist, agent mode, and repository-aware Copilot across real engineering tasks.</p>
+            <p><strong>Module 03 — Prompt &amp; Context Engineering:</strong> selecting, structuring, and compressing repository, design, API, and spec context instead of relying on prompts alone.</p>
+        </div>
+        <div id="tab-2" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-2" tabindex="0" hidden>
+            <p><strong>Module 04 — Spec-Driven Development:</strong> specification, architecture/plan, tasks, and acceptance criteria driving traceable implementation.</p>
+            <p><strong>Module 05 — SDD to a Complete SDLC</strong> and <strong>Module 06 — Test Strategy &amp; Testcontainers:</strong> extending specs across the lifecycle and validating with a real test strategy.</p>
+            <p><strong>Module 07 — MCP-Enabled Agentic Engineering</strong> and <strong>Module 08 — PR Automation &amp; LLM-as-Judge:</strong> agents connected to approved repositories and APIs, plus AI-assisted PR review and quality gates.</p>
+        </div>
+        <div id="tab-3" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-3" tabindex="0" hidden>
+            <p><strong>Module 09 — Studio Workflows (Rovo Studio):</strong> studio-style, specification-led workflows for translating business intent into implementation-ready work.</p>
+            <p><strong>Module 10 — Agent Prism Observability:</strong> the monitoring lens introduced in Module 01, now operated in depth — traces, failure patterns, cost, and quality signals.</p>
+            <p><strong>Module 11 — ROI &amp; Token Economics:</strong> connecting AI usage to measurable cost and return.</p>
+        </div>
+        <div id="tab-4" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-4" tabindex="0" hidden>
+            <p><strong>Module 12 — Capstone &amp; Adoption Roadmap:</strong> the full AI-assisted lifecycle applied end to end, with a concrete adoption roadmap for the team — closing the loop opened in this module.</p>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- SELF-CHECK QUIZ — 5 QUESTIONS             -->
+        <!-- ══════════════════════════════════════════ -->
+        <div class="quiz-section">
+            <h2 class="section-header">Self-Check Quiz</h2>
+
+            <div class="quiz-header">
+                <p>Test your understanding — 5 questions, 70% to pass.</p>
+                <div class="quiz-progress" id="quiz-progress" aria-hidden="true">
+                    <div class="quiz-dot" data-q="1"></div>
+                    <div class="quiz-dot" data-q="2"></div>
+                    <div class="quiz-dot" data-q="3"></div>
+                    <div class="quiz-dot" data-q="4"></div>
+                    <div class="quiz-dot" data-q="5"></div>
+                </div>
+                <div class="quiz-stats" id="quiz-stats" role="status" aria-live="polite"></div>
+            </div>
+
+            <form id="quiz-form">
+                <div id="quiz-container"></div>
+                <p class="quiz-notice" id="quiz-notice" role="alert" hidden></p>
+                <div class="quiz-actions">
+                    <button class="btn btn-primary" type="submit" id="submit-btn">Submit Answers</button>
+                    <button class="btn btn-secondary" type="button" id="reset-btn">Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT (all inline, zero dependencies)  -->
+    <!-- ════════════════════════════════════════════ -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Concept card toggle ────────────────────
+        // Delegated, so no inline onclick and no globals.
+        document.addEventListener('click', function (e) {
+            const header = e.target.closest('.card-header');
+            if (!header) return;
+            const card = header.closest('.concept-card');
+            const open = card.classList.toggle('open');
+            header.setAttribute('aria-expanded', String(open));
+        });
+
+        // ── Tabs ───────────────────────────────────
+        document.addEventListener('click', function (e) {
+            // closest() rather than e.target: a click landing on markup
+            // inside the button would otherwise be missed.
+            const btn = e.target.closest('.tab-btn');
+            if (!btn) return;
+            const list = btn.closest('[role="tablist"]');
+
+            list.querySelectorAll('.tab-btn').forEach(function (b) {
+                b.setAttribute('aria-selected', 'false');
+                const panel = document.getElementById(b.getAttribute('aria-controls'));
+                if (panel) panel.hidden = true;
+            });
+
+            btn.setAttribute('aria-selected', 'true');
+            const active = document.getElementById(btn.getAttribute('aria-controls'));
+            if (active) active.hidden = false;
+        });
+
+        // Arrow-key navigation between tabs, per the WAI-ARIA tabs pattern.
+        document.addEventListener('keydown', function (e) {
+            const btn = e.target.closest('.tab-btn');
+            if (!btn || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+            const tabs = Array.from(btn.closest('[role="tablist"]').querySelectorAll('.tab-btn'));
+            const next = tabs[(tabs.indexOf(btn) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+            next.focus();
+            next.click();
+        });
+
+        // ── Quiz data ──────────────────────────────
+        // `correct` is a 0-based index into `options`.
+        const quizData = [
+            {
+                id: 1,
+                text: "Module 01 frames the AI Champions Programme as a shift away from what?",
+                options: [
+                    "Isolated, ad hoc AI experimentation toward a disciplined, role-based engineering lifecycle",
+                    "Manual coding toward fully autonomous agents that replace engineers",
+                    "GitHub Copilot toward a single in-house AI tool",
+                    "Cloud development toward local-only development"
+                ],
+                correct: 0,
+                explanation: "The throughline is disciplined adoption across roles — from individuals trying Copilot with no shared workflow to a common AI-assisted lifecycle adopted by function. Replacing engineers with autonomous agents is not the goal; ungoverned autonomy is closer to the risk the programme warns against."
+            },
+            {
+                id: 2,
+                text: "Why does the programme introduce Agent Prism (observability) in Module 01 rather than a later module?",
+                options: [
+                    "Observability tooling is the simplest topic, so it makes a gentle start",
+                    "So AI usage is tied to quality, cost, and adoption metrics from day one and a baseline is set early",
+                    "Because Agent Prism must be installed before Copilot can be used",
+                    "It replaces the need for human PR review later in the programme"
+                ],
+                correct: 1,
+                explanation: "Module 01 connects observability directly to the programme's success metrics — cycle time, quality/regression risk, PR review time, testing effort, token usage, and cost — so adoption is measured against a baseline instead of anecdote. It is not a prerequisite install for Copilot, and it complements rather than replaces PR review."
+            },
+            {
+                id: 3,
+                text: "A developer uses Copilot to refactor a legacy service. It compiles and every test passes, but the change quietly bypasses an established architectural pattern. In Module 01's framing this is primarily:",
+                options: [
+                    "A business risk, because it could slow the release",
+                    "Not a risk, since the tests passed",
+                    "An engineering risk — an AI-generated change disrupting brownfield architecture or patterns",
+                    "A compliance risk only"
+                ],
+                correct: 2,
+                explanation: "Module 01 splits risks into business vs engineering. Silent violation of existing architecture or patterns in brownfield code is the canonical engineering risk it names. Passing tests does not clear it, because tests rarely encode architectural intent — the damage is to design integrity and maintainability, not just schedule or compliance."
+            },
+            {
+                id: 4,
+                text: "Your role is DevOps/SRE. Which set of AI Champion responsibilities does Module 01 map to your function?",
+                options: [
+                    "Owning CI/PR pipelines, MCP tool governance, and connecting Agent Prism telemetry to operational review",
+                    "Building the deepest hands-on Copilot, SDD, and Testcontainers test-strategy skill",
+                    "Owning architecture and dependency analysis and change-impact review",
+                    "Focusing on studio-style workflows and translating business intent into specs"
+                ],
+                correct: 0,
+                explanation: "One shared foundation, then role-specific depth. DevOps/SRE owns pipelines, MCP governance, and wiring telemetry into operations. Deep test-strategy work belongs to developers/testers, architecture and change-impact to architects and eng leads, and spec quality to product/program/design roles."
+            },
+            {
+                id: 5,
+                text: "How are the programme's success metrics (implementation cycle time, quality/regression risk, PR review time, testing effort, token usage, AI cost) applied across the AI-assisted lifecycle?",
+                options: [
+                    "Only at the capstone module, once all capabilities are in place",
+                    "Only during the final Observe, Measure, Scale stage",
+                    "Every stage of the lifecycle is measured against the same set of metrics",
+                    "Each tool defines its own metrics, which are compared at the end"
+                ],
+                correct: 2,
+                explanation: "The lifecycle's throughline is that every stage — from Copilot foundations through observability — is evaluated against one consistent metric set. Deferring measurement to the capstone or the last stage would defeat the point of baselining in Module 01, and per-tool metrics would not be comparable."
+            }
+        ];
+
+        const PASS_MARK = 70;
+        const answers = {};
+        let submitted = false;
+
+        const form      = document.getElementById('quiz-form');
+        const container = document.getElementById('quiz-container');
+        const stats     = document.getElementById('quiz-stats');
+        const notice    = document.getElementById('quiz-notice');
+        const submitBtn = document.getElementById('submit-btn');
+        const resetBtn  = document.getElementById('reset-btn');
+
+        function esc(value) {
+            return String(value).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function renderQuiz() {
+            container.innerHTML = quizData.map(function (q, idx) {
+                const opts = q.options.map(function (opt, i) {
+                    return '<label class="option" data-q="' + q.id + '" data-i="' + i + '">' +
+                             '<input type="radio" name="q' + q.id + '" value="' + i + '">' +
+                             '<span class="marker"></span><span>' + esc(opt) + '</span>' +
+                           '</label>';
+                }).join('');
+
+                return '<fieldset class="question-card" data-q="' + q.id + '">' +
+                         '<legend class="question-number">Question ' + (idx + 1) + ' of ' + quizData.length + '</legend>' +
+                         '<p class="question-text">' + esc(q.text) + '</p>' +
+                         '<div class="options">' + opts + '</div>' +
+                         '<p class="feedback" id="fb-' + q.id + '" role="status" aria-live="polite" hidden></p>' +
+                       '</fieldset>';
+            }).join('');
+        }
+
+        container.addEventListener('change', function (e) {
+            if (submitted || e.target.type !== 'radio') return;
+            const label = e.target.closest('.option');
+            const qId = Number(label.dataset.q);
+
+            // Scoped to .option — .question-card and .quiz-dot carry the same
+            // data-q attribute and must not be caught by this query.
+            container.querySelectorAll('.option[data-q="' + qId + '"]')
+                     .forEach(function (el) { el.classList.remove('selected'); });
+
+            label.classList.add('selected');
+            answers[qId] = Number(label.dataset.i);
+            notice.hidden = true;
+            updateProgress();
+        });
+
+        // Before submission this shows the answered count ONLY. A running
+        // score here would let a learner cycle options and read off the
+        // answers without ever submitting.
+        function updateProgress() {
+            const answered = Object.keys(answers).length;
+
+            if (!submitted) {
+                // Only repaint the dots pre-submit. After grading they carry
+                // correct/incorrect, and resetting them here would wipe that.
+                document.querySelectorAll('.quiz-dot').forEach(function (dot) {
+                    dot.className = 'quiz-dot' + (answers[Number(dot.dataset.q)] !== undefined ? ' answered' : '');
+                });
+                stats.innerHTML = '<span>Answered: <strong>' + answered + '</strong>/' + quizData.length + '</span>';
+                return;
+            }
+
+            const correct = calcScore();
+            const pct = Math.round((correct / quizData.length) * 100);
+            stats.innerHTML =
+                '<span>Correct: <strong>' + correct + '</strong>/' + quizData.length + '</span>' +
+                '<span>Score: <strong>' + pct + '%</strong></span>' +
+                '<span>' + (pct >= PASS_MARK ? 'Passed' : 'Below ' + PASS_MARK + '% — review and retry') + '</span>';
+        }
+
+        function calcScore() {
+            return quizData.filter(function (q) { return answers[q.id] === q.correct; }).length;
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Inline message rather than alert(): alert() is suppressed in
+            // some embedded contexts and cannot be styled or announced.
+            const missing = quizData.find(function (q) { return answers[q.id] === undefined; });
+            if (missing) {
+                notice.textContent = 'Answer all ' + quizData.length + ' questions before submitting.';
+                notice.hidden = false;
+                const card = container.querySelector('.question-card[data-q="' + missing.id + '"]');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const input = card.querySelector('input');
+                if (input) input.focus();
+                return;
+            }
+
+            submitted = true;
+            notice.hidden = true;
+            submitBtn.disabled = true;
+
+            quizData.forEach(function (q) {
+                const card = container.querySelector('.question-card[data-q="' + q.id + '"]');
+                const wasCorrect = answers[q.id] === q.correct;
+
+                card.querySelectorAll('.option').forEach(function (opt) {
+                    const i = Number(opt.dataset.i);
+                    const input = opt.querySelector('input');
+                    if (input) input.disabled = true;
+                    opt.classList.add('locked');
+                    if (i === q.correct) opt.classList.add('correct');
+                    else if (answers[q.id] === i) opt.classList.add('incorrect');
+                });
+
+                const fb = document.getElementById('fb-' + q.id);
+                fb.textContent = (wasCorrect ? '✓ Correct. ' : '✗ Incorrect. ') + q.explanation;
+                fb.className = 'feedback ' + (wasCorrect ? 'correct' : 'incorrect');
+                fb.hidden = false;
+                card.classList.add(wasCorrect ? 'correct' : 'incorrect');
+
+                const dot = document.querySelector('.quiz-dot[data-q="' + q.id + '"]');
+                dot.className = 'quiz-dot ' + (wasCorrect ? 'correct' : 'incorrect');
+            });
+
+            updateProgress();
+        });
+
+        resetBtn.addEventListener('click', function () {
+            Object.keys(answers).forEach(function (k) { delete answers[k]; });
+            submitted = false;
+            submitBtn.disabled = false;
+            notice.hidden = true;
+            renderQuiz();
+            updateProgress();
+        });
+
+        // ── Init ───────────────────────────────────
+        renderQuiz();
+        updateProgress();
+    })();
+    </script>
+</body>
+</html>
