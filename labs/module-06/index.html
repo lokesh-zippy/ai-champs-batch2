@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  Module concept page — lab-visualizer skill.
+
+  COPY this file to labs/module-NN/index.html, then replace the [BRACKETED]
+  placeholders and the `quizData` array with module-specific content.
+
+  Keep the <style> and <script> blocks byte-identical between modules. They
+  carry fixes that are easy to silently reintroduce when a page is written
+  from memory instead of copied:
+
+    * the score readout stays hidden until submit (a live score lets a learner
+      click each option and read the answer off the counter)
+    * .card-body uses grid-template-rows, not max-height, so a tall concept
+      card cannot clip its own content
+    * flow-step animation delays use :nth-of-type, because :nth-child counts
+      the arrow <span>s and lands the delays on the wrong elements
+    * prefers-reduced-motion restores opacity — with animations disabled, a
+      fadeInUp element that starts at opacity:0 never becomes visible
+    * concept headers and quiz options are real focusable controls, so the
+      page is keyboard navigable
+
+  Delete any section the module does not need (comparison, stats, tabs).
+  ===========================================================================
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Module 06: Test Strategy &amp; Testcontainers</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-hover: #2980b9;
+            --secondary: #2ecc71;
+            --accent: #e74c3c;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --correct: #22c55e;
+            --incorrect: #ef4444;
+            --neutral: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Visible focus ring on every interactive element. */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ── Hero ─────────────────────────────────── */
+        .hero {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+            padding: 4rem 2rem 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .hero .subtitle { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        /* ── Layout ───────────────────────────────── */
+        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+        /* ── Section Headers ──────────────────────── */
+        .section-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* ── Concept Cards ────────────────────────── */
+        .concept-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .concept-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(52, 152, 219, 0.15);
+        }
+        /* Accordion pattern: the heading wraps the button, so the card is
+           reachable by Tab and toggles on Enter/Space while still appearing
+           in the document outline. A <div onclick> is invisible to keyboard
+           users; a <button> wrapping the <h3> is invalid HTML. */
+        .concept-card .card-heading { margin: 0; font-size: inherit; font-weight: inherit; }
+        .concept-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            user-select: none;
+        }
+        .concept-card .card-title-text { flex: 1; font-size: 1.2rem; font-weight: 600; }
+        .concept-card .toggle-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease;
+            color: var(--primary);
+        }
+        .concept-card.open .toggle-icon { transform: rotate(90deg); }
+
+        /* grid-template-rows animates to the content's natural height, so a
+           card taller than an arbitrary max-height is never clipped. */
+        .concept-card .card-body {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.4s ease;
+        }
+        .concept-card.open .card-body { grid-template-rows: 1fr; }
+        .concept-card .card-body-inner { overflow: hidden; }
+        .concept-card.open .card-body-inner { padding-top: 1.25rem; }
+        .concept-card .definition {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        /* ── Diagram Boxes ────────────────────────── */
+        .diagram-container {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+        .diagram-container svg { max-width: 100%; height: auto; }
+
+        /* ── Animated Flow ────────────────────────── */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        .flow-step {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1.25rem;
+            text-align: center;
+            min-width: 120px;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeInUp 0.4s forwards;
+        }
+        /* :nth-of-type counts <div>s only. :nth-child would count the arrow
+           <span>s too and apply the delays to the wrong elements. */
+        .flow-step:nth-of-type(2) { animation-delay: 0.1s; }
+        .flow-step:nth-of-type(3) { animation-delay: 0.2s; }
+        .flow-step:nth-of-type(4) { animation-delay: 0.3s; }
+        .flow-step:nth-of-type(5) { animation-delay: 0.4s; }
+        .flow-step .step-label { font-size: 0.8rem; color: var(--text-muted); }
+        .flow-step .step-name { font-weight: 600; }
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; animation: pulse 1.5s infinite; }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ── Comparison Table ─────────────────────── */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .comparison .col {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+        }
+        .comparison .col h4 { margin-bottom: 0.75rem; }
+        .comparison .col.pro { border-top: 3px solid var(--correct); }
+        .comparison .col.con { border-top: 3px solid var(--incorrect); }
+        .comparison ul { list-style: none; padding: 0; }
+        .comparison li { padding: 0.35rem 0; padding-left: 1.25rem; position: relative; }
+        .comparison li::before { content: '•'; position: absolute; left: 0; color: var(--primary); }
+
+        /* ── Interactive Code Block ────────────────── */
+        .code-block {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        .code-block .code-header {
+            background: var(--bg);
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre {
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* ── Stats Row ────────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-card .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .stat-card .stat-source {
+            font-size: 0.7rem;
+            color: var(--neutral);
+            margin-top: 0.5rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────── */
+        .tabs { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+        .tab-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.95rem;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .tab-btn[aria-selected="true"] {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .tab-content[hidden] { display: none; }
+
+        /* ── Quiz Section ─────────────────────────── */
+        .quiz-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--accent);
+        }
+        .quiz-header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        .quiz-progress {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .quiz-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+        .quiz-dot.answered { background: var(--primary); }
+        .quiz-dot.correct { background: var(--correct); }
+        .quiz-dot.incorrect { background: var(--incorrect); }
+        .quiz-stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+        .question-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--neutral);
+            transition: border-color 0.3s;
+        }
+        .question-card.correct { border-left-color: var(--correct); }
+        .question-card.incorrect { border-left-color: var(--incorrect); }
+        .question-number { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; padding: 0; }
+        .question-text { font-weight: 500; margin-bottom: 1rem; }
+        .options { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        /* Real radio inputs: arrow keys move within a question, Tab moves
+           between questions, and screen readers announce "2 of 4". */
+        .option {
+            display: block;
+            position: relative;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        .option:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .option:hover:not(.locked) { border-color: var(--primary); background: rgba(52,152,219,0.1); }
+        .option.locked { cursor: not-allowed; }
+        .option.selected { border-color: var(--primary); background: rgba(52,152,219,0.15); }
+        .option.correct { border-color: var(--correct); background: rgba(34,197,94,0.15); }
+        .option.incorrect { border-color: var(--incorrect); background: rgba(239,68,68,0.15); }
+        /* Result marked with a glyph as well as colour (WCAG 1.4.1). */
+        .option .marker { font-weight: 700; }
+        .option.correct .marker::before { content: '\2713\00a0'; color: var(--correct); }
+        .option.incorrect .marker::before { content: '\2717\00a0'; color: var(--incorrect); }
+
+        .feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .feedback[hidden] { display: none; }
+        .feedback.correct { background: rgba(34,197,94,0.1); color: var(--correct); }
+        .feedback.incorrect { background: rgba(239,68,68,0.1); color: var(--incorrect); }
+
+        .quiz-notice {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            background: rgba(231,76,60,0.12);
+            color: #f5a097;
+            font-size: 0.9rem;
+        }
+        .quiz-notice[hidden] { display: none; }
+
+        .quiz-actions { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--surface-hover); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width: 640px) {
+            .hero { padding: 2.5rem 1rem 2rem; }
+            .hero h1 { font-size: 1.75rem; }
+            .container { padding: 1rem; }
+            .comparison { grid-template-columns: 1fr; }
+            .flow { justify-content: center; }
+            .quiz-actions .btn { flex: 1 1 100%; }
+        }
+
+        /* ── Reduced motion ────────────────────────── */
+        /* Without the explicit opacity/transform reset, .flow-step keeps the
+           opacity:0 it starts at and the content is invisible. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .flow-step { opacity: 1; transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- HERO                                        -->
+    <!-- ════════════════════════════════════════════ -->
+    <section class="hero">
+        <h1>Module 06: Test Strategy, Testcontainers &amp; End-to-End Validation</h1>
+        <p class="subtitle">Deriving a test strategy directly from the SDD feature's acceptance criteria, validating against real service and database dependencies with Testcontainers, and proving the strategy catches a real defect.</p>
+        <span class="badge">Interactive Concept Guide</span>
+    </section>
+
+    <div class="container">
+        <!-- ══════════════════════════════════════════ -->
+        <!-- CONCEPT CARDS                             -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Key Concepts</h2>
+
+        <div class="concept-card open">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="true" aria-controls="concept-1-body">
+                    <span class="card-title-text">1 · From Acceptance Criteria to Test Strategy</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-1-body">
+                <div class="card-body-inner">
+                    <p class="definition">The specification doesn't just describe the feature — it defines what <strong>"tested"</strong> means for it. Every test layer exists because some part of the spec needs a specific kind of proof.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 560 210" width="560" height="210"
+                             role="img" aria-label="The specification and acceptance criteria node branches to five test layers: unit tests, integration tests, API and database validation, contract tests, and end-to-end tests.">
+                            <line x1="280" y1="62" x2="58"  y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="62" x2="169" y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="62" x2="280" y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="62" x2="391" y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="62" x2="502" y2="140" stroke="#334155" stroke-width="2"/>
+                            <rect x="188" y="16" width="184" height="46" rx="8" fill="#1e3a8a"/>
+                            <text x="280" y="38" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-size="12" font-weight="700">Specification &amp;</text>
+                            <text x="280" y="54" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-size="12" font-weight="700">Acceptance Criteria</text>
+                            <g font-family="sans-serif" font-size="10.5" fill="#e2e8f0" text-anchor="middle">
+                                <rect x="8"   y="140" width="100" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="58"  y="163">Unit</text><text x="58" y="179">tests</text>
+                                <rect x="119" y="140" width="100" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="169" y="163">Integration</text><text x="169" y="179">tests</text>
+                                <rect x="230" y="140" width="100" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="280" y="163">API / database</text><text x="280" y="179">validation</text>
+                                <rect x="341" y="140" width="100" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="391" y="163">Contract</text><text x="391" y="179">tests</text>
+                                <rect x="452" y="140" width="100" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="502" y="163">End-to-end</text><text x="502" y="179">tests</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition">A test strategy isn't a checklist chosen independently — <strong>every layer is there because a part of the specification needs that kind of proof.</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-2-body">
+                    <span class="card-title-text">2 · The Test Pyramid for SDD Features</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-2-body">
+                <div class="card-body-inner">
+                    <p class="definition">The right amount of each test type — not everything as an end-to-end test.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 460 250" width="460" height="250"
+                             role="img" aria-label="A four-layer test pyramid. From the wide base upward: unit tests (isolated, fast, many); integration tests (service-to-service, Testcontainers-backed); API and contract tests (boundary and contract validation); end-to-end tests (full user flow, few, slow). The base is more, faster, cheaper; the top is fewer, slower, more expensive.">
+                            <polygon points="60,210 400,210 340,160 120,160" fill="#1e3a8a" stroke="#3b82f6"/>
+                            <polygon points="120,160 340,160 300,110 160,110" fill="#1e40af" stroke="#3b82f6"/>
+                            <polygon points="160,110 300,110 262,62 198,62" fill="#5b21b6" stroke="#7c3aed"/>
+                            <polygon points="198,62 262,62 230,20 230,20" fill="#c2410c" stroke="#ea580c"/>
+                            <g font-family="sans-serif" fill="#e2e8f0" text-anchor="middle" font-size="11" font-weight="700">
+                                <text x="230" y="192">UNIT — isolated, fast, many</text>
+                                <text x="230" y="142">INTEGRATION — Testcontainers-backed</text>
+                                <text x="230" y="94">API / CONTRACT</text>
+                                <text x="230" y="50" font-size="9">E2E</text>
+                            </g>
+                            <g font-family="sans-serif" fill="#94a3b8" text-anchor="start" font-size="9">
+                                <text x="410" y="40">fewer, slower,</text><text x="410" y="52">more expensive</text>
+                                <text x="410" y="205">more, faster,</text><text x="410" y="217">cheaper</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition"><strong>The throughline:</strong> Testcontainers is what makes the integration layer trustworthy — real dependencies, without paying full E2E cost for every scenario.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-3-body">
+                    <span class="card-title-text">3 · Testcontainers: What the Suite Actually Talks To</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-3-body">
+                <div class="card-body-inner">
+                    <p class="definition">What changes when integration tests run against the real thing instead of a mock.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 560 200" width="560" height="200"
+                             role="img" aria-label="The Testcontainers-backed test suite node connects to a PostgreSQL container, a message queue container, an external API stub container, and the application under test.">
+                            <line x1="280" y1="60" x2="80"  y2="138" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="60" x2="213" y2="138" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="60" x2="347" y2="138" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="60" x2="480" y2="138" stroke="#334155" stroke-width="2"/>
+                            <rect x="196" y="14" width="168" height="46" rx="8" fill="#1e3a8a"/>
+                            <text x="280" y="36" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-size="12" font-weight="700">Test Suite</text>
+                            <text x="280" y="52" text-anchor="middle" fill="#cbd5e1" font-family="sans-serif" font-size="10">(Testcontainers)</text>
+                            <g font-family="sans-serif" font-size="10.5" fill="#e2e8f0" text-anchor="middle">
+                                <rect x="20"  y="138" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="80"  y="160">PostgreSQL</text><text x="80" y="176">container</text>
+                                <rect x="153" y="138" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="213" y="160">Message queue</text><text x="213" y="176">container</text>
+                                <rect x="287" y="138" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="347" y="160">External API</text><text x="347" y="176">stub container</text>
+                                <rect x="420" y="138" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="480" y="160">Application</text><text x="480" y="176">under test</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition">Containers spin up fresh for each test run and tear down after — <strong>no shared state, no "works on my machine," no drift from production versions.</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-4-body">
+                    <span class="card-title-text">4 · Test Data &amp; Negative Scenarios</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-4-body">
+                <div class="card-body-inner">
+                    <p class="definition">Four categories of input, because a feature is only as tested as its worst-case data.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">Happy path</div>
+                            <div class="step-name">Valid input, expected flow — confirms the feature does what the spec says</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Boundary &amp; edge cases</div>
+                            <div class="step-name">Empty inputs, maximum sizes, off-by-one conditions — where bugs hide</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Negative &amp; invalid input</div>
+                            <div class="step-name">Malformed, unauthorized, or out-of-contract input — confirms it fails safely</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Failure &amp; timeout scenarios</div>
+                            <div class="step-name">A dependency unavailable, slow, or erroring — confirms graceful degradation, not a crash</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-5-body">
+                    <span class="card-title-text">5 · Coverage &amp; Acceptance-Criteria Validation</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-5-body">
+                <div class="card-body-inner">
+                    <p class="definition">The same traceability discipline from Module 04, now checked against <em>running</em> tests: every acceptance criterion maps to a specific test, and every test maps back to a criterion.</p>
+
+                    <div class="code-block">
+                        <div class="code-header">Coverage matrix — acceptance criterion → covering test</div>
+                        <pre><code>AC-01  Valid order returns 201        test_create_order_valid   (unit)          PASS
+AC-02  Duplicate order rejected      test_duplicate_order      (integration)   PASS
+AC-03  Payment timeout handled       test_payment_timeout      (Testcontainers) PASS
+AC-04  Full checkout flow completes  test_checkout_e2e         (E2E)           PASS</code></pre>
+                    </div>
+
+                    <p class="definition">The target: a specification with <strong>no unmapped acceptance criteria</strong>, and a test suite with <strong>no orphaned tests</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- VISUAL COMPARISON                         -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Testcontainers vs Mocks &amp; Stubs</h2>
+        <p class="definition">What real, ephemeral dependencies buy you at the integration layer.</p>
+
+        <div class="comparison">
+            <div class="col pro">
+                <h4>✅ Testcontainers</h4>
+                <ul>
+                    <li>A real database/service, running in an ephemeral container</li>
+                    <li>The same behaviour in CI as in production</li>
+                    <li>Versions pinned to match production dependencies</li>
+                    <li>Integration coverage that is actually trustworthy</li>
+                </ul>
+            </div>
+            <div class="col con">
+                <h4>❌ Mocks &amp; stubs</h4>
+                <ul>
+                    <li>Database behaviour guessed at, not verified</li>
+                    <li>Passes in CI, fails against the real service</li>
+                    <li>Config drift between mock and production accumulates silently</li>
+                    <li>False confidence in integration coverage</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- INTERACTIVE TABS                          -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Hands-On Lab: Prove the Strategy Catches It</h2>
+        <p class="definition">A test strategy is only proven once it has caught something. The closing lab is that proof, not a formality — step through it.</p>
+
+        <div class="tabs" role="tablist" aria-label="Hands-on lab steps">
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-1"
+                    aria-selected="true" aria-controls="tab-1">1 · Derive strategy</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-2"
+                    aria-selected="false" aria-controls="tab-2">2 · Write / update tests</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-3"
+                    aria-selected="false" aria-controls="tab-3">3 · Run with Testcontainers</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-4"
+                    aria-selected="false" aria-controls="tab-4">4 · Inject a defect</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-5"
+                    aria-selected="false" aria-controls="tab-5">5 · Confirm it's caught</button>
+        </div>
+
+        <div id="tab-1" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-1" tabindex="0">
+            <p>Map the specification's acceptance criteria to test types across the pyramid — which criterion needs a unit test, which needs an integration test, which needs E2E.</p>
+        </div>
+        <div id="tab-2" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-2" tabindex="0" hidden>
+            <p>Build or extend the unit, integration, and E2E tests for the feature, including boundary, negative, and failure-scenario data.</p>
+        </div>
+        <div id="tab-3" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-3" tabindex="0" hidden>
+            <p>Execute the suite against real, ephemeral service and database dependencies — the same versions as production, spun up per run.</p>
+        </div>
+        <div id="tab-4" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-4" tabindex="0" hidden>
+            <p>Introduce a realistic bug into the implementation on purpose — a broken validation, a swallowed exception, an off-by-one.</p>
+        </div>
+        <div id="tab-5" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-5" tabindex="0" hidden>
+            <p>Re-run the suite and verify the defect is caught — a red test that points at the injected fault, not silently missed.</p>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- SELF-CHECK QUIZ — 5 QUESTIONS             -->
+        <!-- ══════════════════════════════════════════ -->
+        <div class="quiz-section">
+            <h2 class="section-header">Self-Check Quiz</h2>
+
+            <div class="quiz-header">
+                <p>Test your understanding — 5 questions, 70% to pass.</p>
+                <div class="quiz-progress" id="quiz-progress" aria-hidden="true">
+                    <div class="quiz-dot" data-q="1"></div>
+                    <div class="quiz-dot" data-q="2"></div>
+                    <div class="quiz-dot" data-q="3"></div>
+                    <div class="quiz-dot" data-q="4"></div>
+                    <div class="quiz-dot" data-q="5"></div>
+                </div>
+                <div class="quiz-stats" id="quiz-stats" role="status" aria-live="polite"></div>
+            </div>
+
+            <form id="quiz-form">
+                <div id="quiz-container"></div>
+                <p class="quiz-notice" id="quiz-notice" role="alert" hidden></p>
+                <div class="quiz-actions">
+                    <button class="btn btn-primary" type="submit" id="submit-btn">Submit Answers</button>
+                    <button class="btn btn-secondary" type="button" id="reset-btn">Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT (all inline, zero dependencies)  -->
+    <!-- ════════════════════════════════════════════ -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Concept card toggle ────────────────────
+        // Delegated, so no inline onclick and no globals.
+        document.addEventListener('click', function (e) {
+            const header = e.target.closest('.card-header');
+            if (!header) return;
+            const card = header.closest('.concept-card');
+            const open = card.classList.toggle('open');
+            header.setAttribute('aria-expanded', String(open));
+        });
+
+        // ── Tabs ───────────────────────────────────
+        document.addEventListener('click', function (e) {
+            // closest() rather than e.target: a click landing on markup
+            // inside the button would otherwise be missed.
+            const btn = e.target.closest('.tab-btn');
+            if (!btn) return;
+            const list = btn.closest('[role="tablist"]');
+
+            list.querySelectorAll('.tab-btn').forEach(function (b) {
+                b.setAttribute('aria-selected', 'false');
+                const panel = document.getElementById(b.getAttribute('aria-controls'));
+                if (panel) panel.hidden = true;
+            });
+
+            btn.setAttribute('aria-selected', 'true');
+            const active = document.getElementById(btn.getAttribute('aria-controls'));
+            if (active) active.hidden = false;
+        });
+
+        // Arrow-key navigation between tabs, per the WAI-ARIA tabs pattern.
+        document.addEventListener('keydown', function (e) {
+            const btn = e.target.closest('.tab-btn');
+            if (!btn || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+            const tabs = Array.from(btn.closest('[role="tablist"]').querySelectorAll('.tab-btn'));
+            const next = tabs[(tabs.indexOf(btn) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+            next.focus();
+            next.click();
+        });
+
+        // ── Quiz data ──────────────────────────────
+        // `correct` is a 0-based index into `options`.
+        const quizData = [
+            {
+                id: 1,
+                text: "In Module 06, where does the test strategy for an SDD feature come from?",
+                options: [
+                    "The standard set of test types recommended for the language and framework",
+                    "The specification's acceptance criteria — each test layer proves a specific part of the spec",
+                    "Whatever gaps the coverage tool reports after the code is written",
+                    "The tester's judgement about which parts of the feature feel risky"
+                ],
+                correct: 1,
+                explanation: "The specification defines what \"tested\" means for the feature: every layer — unit, integration, API/contract, E2E — exists because some acceptance criterion needs that kind of proof. A generic per-language checklist, a coverage-tool report, or gut feel can all miss criteria the spec explicitly states."
+            },
+            {
+                id: 2,
+                text: "What shape should the test suite for an SDD feature have?",
+                options: [
+                    "Mostly end-to-end tests, because they exercise the whole feature at once",
+                    "An even split across unit, integration, and E2E",
+                    "Many fast, isolated unit tests at the base; few slow end-to-end tests at the top",
+                    "Only integration tests, since Testcontainers makes them reliable"
+                ],
+                correct: 2,
+                explanation: "The pyramid: unit tests are the wide, cheap base; integration (Testcontainers-backed) sits above; API/contract next; E2E is the narrow, expensive top. Pushing everything to E2E makes the suite slow and flaky; dropping unit tests loses the fastest feedback loop."
+            },
+            {
+                id: 3,
+                text: "Why prefer Testcontainers over mocks and stubs for the integration layer?",
+                options: [
+                    "Mocks are slower to write than container setup",
+                    "A real, version-pinned dependency behaves the same in CI as in production; a mock can pass in CI and fail against the real service as config drifts silently",
+                    "Testcontainers removes the need for unit tests",
+                    "Mocks cannot be used in a CI pipeline at all"
+                ],
+                correct: 1,
+                explanation: "A mock encodes a guess about how the dependency behaves, and that guess drifts from production over time without anyone noticing — green CI, broken prod. Testcontainers runs the actual database/service, pinned to the production version, fresh per run. It complements unit tests rather than replacing them, and mocks can run in CI — they just give false confidence."
+            },
+            {
+                id: 4,
+                text: "The \"failure & timeout\" category of test data exists to confirm what?",
+                options: [
+                    "That the feature runs fast enough under load",
+                    "That invalid user input is rejected with the right error code",
+                    "That when a dependency is slow, unavailable, or erroring, the feature degrades gracefully instead of crashing",
+                    "That the happy path still works after a deployment"
+                ],
+                correct: 2,
+                explanation: "Failure/timeout scenarios target the dependencies, not the user: a database that won't connect, a payment service that hangs. The feature should fail safely — a handled error, a fallback, a clear message — not an unhandled crash. Rejecting malformed input is the separate \"negative & invalid input\" category."
+            },
+            {
+                id: 5,
+                text: "The closing lab injects a deliberate defect into the implementation. What does that step establish?",
+                options: [
+                    "That the feature has bugs the spec missed",
+                    "That the test strategy is proven — it actually catches a real fault, rather than just running green",
+                    "That Testcontainers is configured correctly",
+                    "That the acceptance criteria need rewriting"
+                ],
+                correct: 1,
+                explanation: "A suite that has only ever passed tells you nothing about whether it would catch a regression. Breaking the feature on purpose and watching a specific test go red is the proof that the strategy works — the point of the exercise, not a formality."
+            }
+        ];
+
+        const PASS_MARK = 70;
+        const answers = {};
+        let submitted = false;
+
+        const form      = document.getElementById('quiz-form');
+        const container = document.getElementById('quiz-container');
+        const stats     = document.getElementById('quiz-stats');
+        const notice    = document.getElementById('quiz-notice');
+        const submitBtn = document.getElementById('submit-btn');
+        const resetBtn  = document.getElementById('reset-btn');
+
+        function esc(value) {
+            return String(value).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function renderQuiz() {
+            container.innerHTML = quizData.map(function (q, idx) {
+                const opts = q.options.map(function (opt, i) {
+                    return '<label class="option" data-q="' + q.id + '" data-i="' + i + '">' +
+                             '<input type="radio" name="q' + q.id + '" value="' + i + '">' +
+                             '<span class="marker"></span><span>' + esc(opt) + '</span>' +
+                           '</label>';
+                }).join('');
+
+                return '<fieldset class="question-card" data-q="' + q.id + '">' +
+                         '<legend class="question-number">Question ' + (idx + 1) + ' of ' + quizData.length + '</legend>' +
+                         '<p class="question-text">' + esc(q.text) + '</p>' +
+                         '<div class="options">' + opts + '</div>' +
+                         '<p class="feedback" id="fb-' + q.id + '" role="status" aria-live="polite" hidden></p>' +
+                       '</fieldset>';
+            }).join('');
+        }
+
+        container.addEventListener('change', function (e) {
+            if (submitted || e.target.type !== 'radio') return;
+            const label = e.target.closest('.option');
+            const qId = Number(label.dataset.q);
+
+            // Scoped to .option — .question-card and .quiz-dot carry the same
+            // data-q attribute and must not be caught by this query.
+            container.querySelectorAll('.option[data-q="' + qId + '"]')
+                     .forEach(function (el) { el.classList.remove('selected'); });
+
+            label.classList.add('selected');
+            answers[qId] = Number(label.dataset.i);
+            notice.hidden = true;
+            updateProgress();
+        });
+
+        // Before submission this shows the answered count ONLY. A running
+        // score here would let a learner cycle options and read off the
+        // answers without ever submitting.
+        function updateProgress() {
+            const answered = Object.keys(answers).length;
+
+            if (!submitted) {
+                // Only repaint the dots pre-submit. After grading they carry
+                // correct/incorrect, and resetting them here would wipe that.
+                document.querySelectorAll('.quiz-dot').forEach(function (dot) {
+                    dot.className = 'quiz-dot' + (answers[Number(dot.dataset.q)] !== undefined ? ' answered' : '');
+                });
+                stats.innerHTML = '<span>Answered: <strong>' + answered + '</strong>/' + quizData.length + '</span>';
+                return;
+            }
+
+            const correct = calcScore();
+            const pct = Math.round((correct / quizData.length) * 100);
+            stats.innerHTML =
+                '<span>Correct: <strong>' + correct + '</strong>/' + quizData.length + '</span>' +
+                '<span>Score: <strong>' + pct + '%</strong></span>' +
+                '<span>' + (pct >= PASS_MARK ? 'Passed' : 'Below ' + PASS_MARK + '% — review and retry') + '</span>';
+        }
+
+        function calcScore() {
+            return quizData.filter(function (q) { return answers[q.id] === q.correct; }).length;
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Inline message rather than alert(): alert() is suppressed in
+            // some embedded contexts and cannot be styled or announced.
+            const missing = quizData.find(function (q) { return answers[q.id] === undefined; });
+            if (missing) {
+                notice.textContent = 'Answer all ' + quizData.length + ' questions before submitting.';
+                notice.hidden = false;
+                const card = container.querySelector('.question-card[data-q="' + missing.id + '"]');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const input = card.querySelector('input');
+                if (input) input.focus();
+                return;
+            }
+
+            submitted = true;
+            notice.hidden = true;
+            submitBtn.disabled = true;
+
+            quizData.forEach(function (q) {
+                const card = container.querySelector('.question-card[data-q="' + q.id + '"]');
+                const wasCorrect = answers[q.id] === q.correct;
+
+                card.querySelectorAll('.option').forEach(function (opt) {
+                    const i = Number(opt.dataset.i);
+                    const input = opt.querySelector('input');
+                    if (input) input.disabled = true;
+                    opt.classList.add('locked');
+                    if (i === q.correct) opt.classList.add('correct');
+                    else if (answers[q.id] === i) opt.classList.add('incorrect');
+                });
+
+                const fb = document.getElementById('fb-' + q.id);
+                fb.textContent = (wasCorrect ? '✓ Correct. ' : '✗ Incorrect. ') + q.explanation;
+                fb.className = 'feedback ' + (wasCorrect ? 'correct' : 'incorrect');
+                fb.hidden = false;
+                card.classList.add(wasCorrect ? 'correct' : 'incorrect');
+
+                const dot = document.querySelector('.quiz-dot[data-q="' + q.id + '"]');
+                dot.className = 'quiz-dot ' + (wasCorrect ? 'correct' : 'incorrect');
+            });
+
+            updateProgress();
+        });
+
+        resetBtn.addEventListener('click', function () {
+            Object.keys(answers).forEach(function (k) { delete answers[k]; });
+            submitted = false;
+            submitBtn.disabled = false;
+            notice.hidden = true;
+            renderQuiz();
+            updateProgress();
+        });
+
+        // ── Init ───────────────────────────────────
+        renderQuiz();
+        updateProgress();
+    })();
+    </script>
+</body>
+</html>

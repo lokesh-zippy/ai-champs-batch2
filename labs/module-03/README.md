@@ -1,4 +1,4 @@
-# Module 03 — Prompt Engineering Recap & Context Engineering (Hands-On Lab)
+# Module 03 — Context Engineering (Hands-On Lab)
 
 ## What this lab is
 
@@ -6,19 +6,15 @@ Module 03 does not build a new app. It keeps the **Engineering Task Board** from
 Module 01 as the base and the Copilot customization layer from Module 02
 (`.github/copilot-instructions.md`, prompt files, chat modes, skills) as the
 starting point. On top of that it teaches the discipline every later module
-depends on: **framing a prompt well, then engineering the context** you feed the
-model — selecting, layering, compressing, and scoping it so quality goes up and
-token cost stays flat.
+depends on: **engineering the context** you feed the model — selecting,
+compressing, and scoping it — so quality goes up and token cost stays flat.
 
 | Lab | Focus | You produce |
 |-----|-------|-------------|
-| [01](lab-01-six-prompt-moves.md) | The six prompt-engineering moves | `worksheets/prompts-journal.md` — one prompt evolved through six versions |
-| [02](lab-02-prompt-only-vs-context-engineered.md) | Prompt-only vs context-engineered, measured | A filled [token worksheet](token-worksheet.md) comparing both passes |
-| [03](lab-03-context-sources-and-selection.md) | The context sources map + the *select* stage | `worksheets/context-manifest.md` for the shared task |
-| [04](lab-04-layer-compress-scope.md) | The *layer → compress → scope* pipeline | `.github/prompts/context-brief.prompt.md` — a reusable context builder |
-| [05](lab-05-copilot-spaces-and-boundaries.md) | Copilot Spaces + context boundaries & anti-patterns | A shared **TaskBoard Context** Space + `CONTEXT.md` in the repo |
+| [01](lab-01-prompt-only-vs-context-engineered.md) | Prompt-only vs context-engineered, measured | A filled [token worksheet](token-worksheet.md) comparing both passes |
+| [02](lab-02-select-compress-scope.md) | Select → compress → scope, and bottle it | `worksheets/context-manifest.md`, `.github/prompts/context-brief.prompt.md`, `CONTEXT.md` |
 
-Work through them in order. Total time: about **2 hours**.
+Work through them in order. Total time: about **75 minutes**.
 
 ## The shared task for Module 03
 
@@ -40,7 +36,7 @@ Every lab works the **same feature** so you can compare approaches cleanly:
 > - A test is added in the matching test file before the work is "done".
 > - The other two backends would return byte-identical JSON for the same call.
 
-You will implement it for real in Lab 02 and refine the *approach* in Labs 03–05.
+You implement it for real in Lab 01 and refine the *approach* in Lab 02.
 
 ## Prerequisites
 
@@ -49,8 +45,8 @@ You will implement it for real in Lab 02 and refine the *approach* in Labs 03–
   and `.github/skills/` from Module 02 are on your branch.
 - [Module 01 prerequisites](../setup/prerequisites.md) and a working backend +
   frontend + database.
-- **GitHub Copilot Enterprise** (Spaces in Lab 05 needs Enterprise or Business),
-  signed in inside VS Code.
+- **GitHub Copilot**, signed in inside VS Code. (The optional shared Copilot
+  Space in Lab 02 needs Enterprise or Business; the lab works without it.)
 - **VS Code** with the GitHub Copilot + Copilot Chat extensions (latest).
 - `node` / `npx` on PATH (the token-estimate helper uses it).
 
@@ -181,12 +177,12 @@ platforms) → Files/templates → Verify → Troubleshooting → Recap & carry-
 Context controls (`#`-mentions, the Add Context button), Copilot Spaces, and the
 model picker move often. Menu names in these labs are current as of the course
 date; the [Module 03 guide](../../guides/module-03-prompt-context-engineering.md)
-links the authoritative docs. The *concepts* — the six moves, select → layer →
-compress → scope, context boundaries — are stable.
+links the authoritative docs. The *concepts* — select → compress → scope,
+context boundaries — are stable.
 
 ## After this module
 
-- The repo carries a reusable context-brief prompt and a `CONTEXT.md`.
-- Your team has a shared Copilot Space for the Task Board.
+- The repo carries a reusable `/context-brief` prompt and a `CONTEXT.md`.
+- You have a measured baseline (the token worksheet) for later cost discussions.
 - [Module 04](../module-04/README.md) writes specifications on top of exactly
   this context discipline — a spec is only as precise as the context behind it.

@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  Module concept page — lab-visualizer skill.
+
+  COPY this file to labs/module-NN/index.html, then replace the [BRACKETED]
+  placeholders and the `quizData` array with module-specific content.
+
+  Keep the <style> and <script> blocks byte-identical between modules. They
+  carry fixes that are easy to silently reintroduce when a page is written
+  from memory instead of copied:
+
+    * the score readout stays hidden until submit (a live score lets a learner
+      click each option and read the answer off the counter)
+    * .card-body uses grid-template-rows, not max-height, so a tall concept
+      card cannot clip its own content
+    * flow-step animation delays use :nth-of-type, because :nth-child counts
+      the arrow <span>s and lands the delays on the wrong elements
+    * prefers-reduced-motion restores opacity — with animations disabled, a
+      fadeInUp element that starts at opacity:0 never becomes visible
+    * concept headers and quiz options are real focusable controls, so the
+      page is keyboard navigable
+
+  Delete any section the module does not need (comparison, stats, tabs).
+  ===========================================================================
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Module 07: MCP-Enabled Agentic Engineering</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-hover: #2980b9;
+            --secondary: #2ecc71;
+            --accent: #e74c3c;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --correct: #22c55e;
+            --incorrect: #ef4444;
+            --neutral: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Visible focus ring on every interactive element. */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ── Hero ─────────────────────────────────── */
+        .hero {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+            padding: 4rem 2rem 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .hero .subtitle { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        /* ── Layout ───────────────────────────────── */
+        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+        /* ── Section Headers ──────────────────────── */
+        .section-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* ── Concept Cards ────────────────────────── */
+        .concept-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .concept-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(52, 152, 219, 0.15);
+        }
+        /* Accordion pattern: the heading wraps the button, so the card is
+           reachable by Tab and toggles on Enter/Space while still appearing
+           in the document outline. A <div onclick> is invisible to keyboard
+           users; a <button> wrapping the <h3> is invalid HTML. */
+        .concept-card .card-heading { margin: 0; font-size: inherit; font-weight: inherit; }
+        .concept-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            user-select: none;
+        }
+        .concept-card .card-title-text { flex: 1; font-size: 1.2rem; font-weight: 600; }
+        .concept-card .toggle-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease;
+            color: var(--primary);
+        }
+        .concept-card.open .toggle-icon { transform: rotate(90deg); }
+
+        /* grid-template-rows animates to the content's natural height, so a
+           card taller than an arbitrary max-height is never clipped. */
+        .concept-card .card-body {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.4s ease;
+        }
+        .concept-card.open .card-body { grid-template-rows: 1fr; }
+        .concept-card .card-body-inner { overflow: hidden; }
+        .concept-card.open .card-body-inner { padding-top: 1.25rem; }
+        .concept-card .definition {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        /* ── Diagram Boxes ────────────────────────── */
+        .diagram-container {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+        .diagram-container svg { max-width: 100%; height: auto; }
+
+        /* ── Animated Flow ────────────────────────── */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        .flow-step {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1.25rem;
+            text-align: center;
+            min-width: 120px;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeInUp 0.4s forwards;
+        }
+        /* :nth-of-type counts <div>s only. :nth-child would count the arrow
+           <span>s too and apply the delays to the wrong elements. */
+        .flow-step:nth-of-type(2) { animation-delay: 0.1s; }
+        .flow-step:nth-of-type(3) { animation-delay: 0.2s; }
+        .flow-step:nth-of-type(4) { animation-delay: 0.3s; }
+        .flow-step:nth-of-type(5) { animation-delay: 0.4s; }
+        .flow-step .step-label { font-size: 0.8rem; color: var(--text-muted); }
+        .flow-step .step-name { font-weight: 600; }
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; animation: pulse 1.5s infinite; }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ── Comparison Table ─────────────────────── */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .comparison .col {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+        }
+        .comparison .col h4 { margin-bottom: 0.75rem; }
+        .comparison .col.pro { border-top: 3px solid var(--correct); }
+        .comparison .col.con { border-top: 3px solid var(--incorrect); }
+        .comparison ul { list-style: none; padding: 0; }
+        .comparison li { padding: 0.35rem 0; padding-left: 1.25rem; position: relative; }
+        .comparison li::before { content: '•'; position: absolute; left: 0; color: var(--primary); }
+
+        /* ── Interactive Code Block ────────────────── */
+        .code-block {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        .code-block .code-header {
+            background: var(--bg);
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre {
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* ── Stats Row ────────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .stat-card .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .stat-card .stat-source {
+            font-size: 0.7rem;
+            color: var(--neutral);
+            margin-top: 0.5rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────── */
+        .tabs { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+        .tab-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.95rem;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .tab-btn[aria-selected="true"] {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .tab-content[hidden] { display: none; }
+
+        /* ── Quiz Section ─────────────────────────── */
+        .quiz-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--accent);
+        }
+        .quiz-header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        .quiz-progress {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .quiz-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+        .quiz-dot.answered { background: var(--primary); }
+        .quiz-dot.correct { background: var(--correct); }
+        .quiz-dot.incorrect { background: var(--incorrect); }
+        .quiz-stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+        .question-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--neutral);
+            transition: border-color 0.3s;
+        }
+        .question-card.correct { border-left-color: var(--correct); }
+        .question-card.incorrect { border-left-color: var(--incorrect); }
+        .question-number { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; padding: 0; }
+        .question-text { font-weight: 500; margin-bottom: 1rem; }
+        .options { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        /* Real radio inputs: arrow keys move within a question, Tab moves
+           between questions, and screen readers announce "2 of 4". */
+        .option {
+            display: block;
+            position: relative;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        .option:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .option:hover:not(.locked) { border-color: var(--primary); background: rgba(52,152,219,0.1); }
+        .option.locked { cursor: not-allowed; }
+        .option.selected { border-color: var(--primary); background: rgba(52,152,219,0.15); }
+        .option.correct { border-color: var(--correct); background: rgba(34,197,94,0.15); }
+        .option.incorrect { border-color: var(--incorrect); background: rgba(239,68,68,0.15); }
+        /* Result marked with a glyph as well as colour (WCAG 1.4.1). */
+        .option .marker { font-weight: 700; }
+        .option.correct .marker::before { content: '\2713\00a0'; color: var(--correct); }
+        .option.incorrect .marker::before { content: '\2717\00a0'; color: var(--incorrect); }
+
+        .feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .feedback[hidden] { display: none; }
+        .feedback.correct { background: rgba(34,197,94,0.1); color: var(--correct); }
+        .feedback.incorrect { background: rgba(239,68,68,0.1); color: var(--incorrect); }
+
+        .quiz-notice {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            background: rgba(231,76,60,0.12);
+            color: #f5a097;
+            font-size: 0.9rem;
+        }
+        .quiz-notice[hidden] { display: none; }
+
+        .quiz-actions { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--surface-hover); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width: 640px) {
+            .hero { padding: 2.5rem 1rem 2rem; }
+            .hero h1 { font-size: 1.75rem; }
+            .container { padding: 1rem; }
+            .comparison { grid-template-columns: 1fr; }
+            .flow { justify-content: center; }
+            .quiz-actions .btn { flex: 1 1 100%; }
+        }
+
+        /* ── Reduced motion ────────────────────────── */
+        /* Without the explicit opacity/transform reset, .flow-step keeps the
+           opacity:0 it starts at and the content is invisible. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .flow-step { opacity: 1; transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- HERO                                        -->
+    <!-- ════════════════════════════════════════════ -->
+    <section class="hero">
+        <h1>Module 07: MCP-Enabled Agentic Engineering Workflows &amp; Reusable Skills</h1>
+        <p class="subtitle">Connecting agents to approved repositories, APIs, databases, documentation, and test infrastructure through the Model Context Protocol — under clear governance — then packaging proven workflows into reusable, versioned engineering assets.</p>
+        <span class="badge">Interactive Concept Guide</span>
+    </section>
+
+    <div class="container">
+        <!-- ══════════════════════════════════════════ -->
+        <!-- CONCEPT CARDS                             -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Key Concepts</h2>
+
+        <div class="concept-card open">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="true" aria-controls="concept-1-body">
+                    <span class="card-title-text">1 · What MCP Is</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-1-body">
+                <div class="card-body-inner">
+                    <p class="definition">The <strong>Model Context Protocol</strong> is an open standard that connects an AI agent to approved tools, repositories, services, and enterprise workflows through <strong>one consistent interface</strong> — instead of a custom, hand-built integration for every source.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 560 210" width="560" height="210"
+                             role="img" aria-label="An agent connects through a single MCP layer to five approved sources: repositories, APIs, databases, documentation, and test infrastructure.">
+                            <rect x="204" y="14" width="152" height="42" rx="8" fill="#1e3a8a"/>
+                            <text x="280" y="40" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-size="13" font-weight="700">AI Agent</text>
+                            <rect x="150" y="76" width="260" height="34" rx="8" fill="#3b0764" stroke="#7e22ce"/>
+                            <text x="280" y="98" text-anchor="middle" fill="#e9d5ff" font-family="sans-serif" font-size="12" font-weight="700">Model Context Protocol</text>
+                            <line x1="280" y1="56" x2="280" y2="76" stroke="#475569" stroke-width="2"/>
+                            <line x1="280" y1="110" x2="58"  y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="110" x2="169" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="110" x2="280" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="110" x2="391" y2="150" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="110" x2="502" y2="150" stroke="#334155" stroke-width="2"/>
+                            <g font-family="sans-serif" font-size="10.5" fill="#e2e8f0" text-anchor="middle">
+                                <rect x="8"   y="150" width="100" height="46" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="58"  y="178">Repositories</text>
+                                <rect x="119" y="150" width="100" height="46" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="169" y="178">APIs</text>
+                                <rect x="230" y="150" width="100" height="46" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="280" y="178">Databases</text>
+                                <rect x="341" y="150" width="100" height="46" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="391" y="178">Documentation</text>
+                                <rect x="452" y="150" width="100" height="46" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="502" y="178">Test infra</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition">The programme treats MCP as a <strong>key engineering capability</strong> for connecting agents to governed enterprise context. Retrieval-augmented generation (RAG) is intentionally excluded from the core programme so this time goes to deeper SDD, testing, and MCP work.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-2-body">
+                    <span class="card-title-text">2 · MCP Building Blocks: Servers, Tools, Resources</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-2-body">
+                <div class="card-body-inner">
+                    <p class="definition">An <strong>MCP server</strong> wraps one system and advertises what an agent may do with it. The agent (the MCP host) discovers those capabilities at runtime and invokes them.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">MCP server</div>
+                            <div class="step-name">Wraps one approved system — a repo, a database, a test runner</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Exposes</div>
+                            <div class="step-name">Tools (actions to call) · Resources (data to read) · Prompts (reusable templates)</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Agent discovers</div>
+                            <div class="step-name">Reads the capability list at runtime — nothing hard-coded</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Agent invokes</div>
+                            <div class="step-name">Calls a tool or reads a resource, subject to governance</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-3-body">
+                    <span class="card-title-text">3 · The MCP-Enabled Engineering Workflow</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-3-body">
+                <div class="card-body-inner">
+                    <p class="definition">The hands-on workflow: an agent chaining approved tools across a real engineering task, end to end.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">1 · Repository analysis</div>
+                            <div class="step-name">Read structure, dependencies, and conventions through a repo tool</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">2 · Specification validation</div>
+                            <div class="step-name">Check the spec against the quality bar</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">3 · Test execution</div>
+                            <div class="step-name">Run the suite against test infrastructure</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">4 · Result analysis / PR evidence</div>
+                            <div class="step-name">Summarize outcomes and attach evidence to the PR</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-4-body">
+                    <span class="card-title-text">4 · Governance: Permissions, Approvals, Boundaries</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-4-body">
+                <div class="card-body-inner">
+                    <p class="definition">An MCP-connected agent can reach real systems, so the connection is only safe with deliberate controls around it.</p>
+
+                    <div class="diagram-container">
+                        <svg viewBox="0 0 560 170" width="560" height="170"
+                             role="img" aria-label="Six governance concerns for an MCP-enabled agent: tool selection, permission scoping, human approval gates, context and state boundaries, failure handling, and security.">
+                            <g font-family="sans-serif" font-size="10.5" fill="#e2e8f0" text-anchor="middle">
+                                <rect x="8"   y="20" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="68"  y="42">Tool selection</text><text x="68" y="58">(minimal set)</text>
+                                <rect x="140" y="20" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="200" y="42">Permission</text><text x="200" y="58">scoping</text>
+                                <rect x="272" y="20" width="120" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="332" y="42">Human approval</text><text x="332" y="58">gates</text>
+                                <rect x="404" y="20" width="148" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="478" y="42">Context / state</text><text x="478" y="58">boundaries</text>
+                                <rect x="74"  y="90" width="180" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="164" y="112">Failure handling</text><text x="164" y="128">(safe, observable)</text>
+                                <rect x="300" y="90" width="180" height="52" rx="8" fill="#1e293b" stroke="#334155"/>
+                                <text x="390" y="112">Security</text><text x="390" y="128">(approved sources only)</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <p class="definition">The guiding rule: a <strong>curated, minimal set</strong> of tools with scoped permissions and human approval on consequential actions — if a human engineer can't say which tool a situation calls for, the agent can't be expected to either.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concept-card">
+            <h3 class="card-heading">
+                <button class="card-header" type="button" aria-expanded="false" aria-controls="concept-5-body">
+                    <span class="card-title-text">5 · Reusable Engineering Skills</span>
+                    <span class="toggle-icon" aria-hidden="true">▶</span>
+                </button>
+            </h3>
+            <div class="card-body" id="concept-5-body">
+                <div class="card-body-inner">
+                    <p class="definition">Once an agent-assisted workflow is proven, it is packaged as a <strong>reusable asset</strong> — not left as a prompt someone re-types.</p>
+
+                    <div class="flow">
+                        <div class="flow-step">
+                            <div class="step-label">Prove a pattern once</div>
+                            <div class="step-name">A workflow that reliably produces good output</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Extract</div>
+                            <div class="step-name">Specifications, instructions, prompt packs, test/review heuristics, agent behaviours</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Version &amp; assign an owner</div>
+                            <div class="step-name">Tracked alongside code, with a named maintainer</div>
+                        </div>
+                        <span class="flow-arrow" aria-hidden="true">→</span>
+                        <div class="flow-step">
+                            <div class="step-label">Reuse across projects</div>
+                            <div class="step-name">The same skill applied by other teams, consistently</div>
+                        </div>
+                    </div>
+
+                    <p class="definition">Lab candidates: a <strong>spec validator</strong>, a <strong>test-enhancement assistant</strong>, or a <strong>PR reviewer</strong> — each with a documented reuse and governance model.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- VISUAL COMPARISON                         -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">MCP vs Custom Point-to-Point Integrations</h2>
+        <p class="definition">Why a single protocol beats a bespoke connector per tool.</p>
+
+        <div class="comparison">
+            <div class="col pro">
+                <h4>✅ MCP — one standard interface</h4>
+                <ul>
+                    <li>One protocol for every approved tool, repo, and service</li>
+                    <li>Capabilities discovered at runtime, not hard-coded</li>
+                    <li>Permissions, approvals, and boundaries defined once</li>
+                    <li>The same agent setup transfers across teams and projects</li>
+                </ul>
+            </div>
+            <div class="col con">
+                <h4>❌ Custom per-tool integrations</h4>
+                <ul>
+                    <li>A bespoke integration to build and maintain for every source</li>
+                    <li>Breaks whenever a tool's API changes</li>
+                    <li>Governance bolted on per integration, inconsistently</li>
+                    <li>Little of it transfers to the next project</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- INTERACTIVE TABS                          -->
+        <!-- ══════════════════════════════════════════ -->
+        <h2 class="section-header">Reusable Skill Candidates</h2>
+        <p class="definition">The hands-on lab packages one of these into a versioned, owned skill with a documented governance model.</p>
+
+        <div class="tabs" role="tablist" aria-label="Reusable skill candidates">
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-1"
+                    aria-selected="true" aria-controls="tab-1">Spec validator</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-2"
+                    aria-selected="false" aria-controls="tab-2">Test-enhancement assistant</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-btn-3"
+                    aria-selected="false" aria-controls="tab-3">PR reviewer</button>
+        </div>
+
+        <div id="tab-1" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-1" tabindex="0">
+            <p>Checks a specification against the Module 04 quality bar — unambiguous, testable, traceable, complete — and flags gaps before planning starts.</p>
+        </div>
+        <div id="tab-2" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-2" tabindex="0" hidden>
+            <p>Reviews an existing test suite and proposes the missing edge-case, negative, and failure-scenario tests, mapped back to acceptance criteria.</p>
+        </div>
+        <div id="tab-3" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-3" tabindex="0" hidden>
+            <p>Applies the team's review heuristics against a defined rubric and produces evidence-based comments — the input Module 08's PR quality gates build on.</p>
+        </div>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!-- SELF-CHECK QUIZ — 5 QUESTIONS             -->
+        <!-- ══════════════════════════════════════════ -->
+        <div class="quiz-section">
+            <h2 class="section-header">Self-Check Quiz</h2>
+
+            <div class="quiz-header">
+                <p>Test your understanding — 5 questions, 70% to pass.</p>
+                <div class="quiz-progress" id="quiz-progress" aria-hidden="true">
+                    <div class="quiz-dot" data-q="1"></div>
+                    <div class="quiz-dot" data-q="2"></div>
+                    <div class="quiz-dot" data-q="3"></div>
+                    <div class="quiz-dot" data-q="4"></div>
+                    <div class="quiz-dot" data-q="5"></div>
+                </div>
+                <div class="quiz-stats" id="quiz-stats" role="status" aria-live="polite"></div>
+            </div>
+
+            <form id="quiz-form">
+                <div id="quiz-container"></div>
+                <p class="quiz-notice" id="quiz-notice" role="alert" hidden></p>
+                <div class="quiz-actions">
+                    <button class="btn btn-primary" type="submit" id="submit-btn">Submit Answers</button>
+                    <button class="btn btn-secondary" type="button" id="reset-btn">Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT (all inline, zero dependencies)  -->
+    <!-- ════════════════════════════════════════════ -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Concept card toggle ────────────────────
+        // Delegated, so no inline onclick and no globals.
+        document.addEventListener('click', function (e) {
+            const header = e.target.closest('.card-header');
+            if (!header) return;
+            const card = header.closest('.concept-card');
+            const open = card.classList.toggle('open');
+            header.setAttribute('aria-expanded', String(open));
+        });
+
+        // ── Tabs ───────────────────────────────────
+        document.addEventListener('click', function (e) {
+            // closest() rather than e.target: a click landing on markup
+            // inside the button would otherwise be missed.
+            const btn = e.target.closest('.tab-btn');
+            if (!btn) return;
+            const list = btn.closest('[role="tablist"]');
+
+            list.querySelectorAll('.tab-btn').forEach(function (b) {
+                b.setAttribute('aria-selected', 'false');
+                const panel = document.getElementById(b.getAttribute('aria-controls'));
+                if (panel) panel.hidden = true;
+            });
+
+            btn.setAttribute('aria-selected', 'true');
+            const active = document.getElementById(btn.getAttribute('aria-controls'));
+            if (active) active.hidden = false;
+        });
+
+        // Arrow-key navigation between tabs, per the WAI-ARIA tabs pattern.
+        document.addEventListener('keydown', function (e) {
+            const btn = e.target.closest('.tab-btn');
+            if (!btn || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+            const tabs = Array.from(btn.closest('[role="tablist"]').querySelectorAll('.tab-btn'));
+            const next = tabs[(tabs.indexOf(btn) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+            next.focus();
+            next.click();
+        });
+
+        // ── Quiz data ──────────────────────────────
+        // `correct` is a 0-based index into `options`.
+        const quizData = [
+            {
+                id: 1,
+                text: "What problem does the Model Context Protocol solve for AI-assisted engineering?",
+                options: [
+                    "It makes the language model itself more capable at reasoning",
+                    "It replaces fragmented, custom, per-source integrations with one open standard for connecting agents to approved tools, repos, and services",
+                    "It stores documents so the agent can retrieve them by similarity",
+                    "It automatically writes the integration code for any API"
+                ],
+                correct: 1,
+                explanation: "MCP is a connection standard: one protocol so an agent can reach many approved systems the same way, with governance defined once. It does not change the model. Retrieval-by-similarity is RAG, which this programme deliberately leaves out of the core."
+            },
+            {
+                id: 2,
+                text: "What does an MCP server expose to an agent?",
+                options: [
+                    "A fine-tuned copy of the model for that system",
+                    "Only a read-only snapshot of a database",
+                    "Tools (actions the agent can call), resources (data it can read), and prompts — which the agent discovers at runtime",
+                    "A fixed script the agent must run start to finish"
+                ],
+                correct: 2,
+                explanation: "An MCP server wraps one system and advertises tools, resources, and prompts. The agent reads that capability list at runtime and chooses what to invoke — nothing is hard-coded into the agent, and it is not limited to read-only data or a fixed script."
+            },
+            {
+                id: 3,
+                text: "A team is deciding which tools to give an MCP-enabled agent. What is the right approach?",
+                options: [
+                    "Connect every available tool so the agent is never blocked",
+                    "A curated, minimal set with scoped permissions and human approval on consequential actions",
+                    "Let the agent request new tools and auto-approve them",
+                    "Give broad access in a sandbox and full access in production"
+                ],
+                correct: 1,
+                explanation: "Governance is a core part of the module: minimal tool set, scoped permissions, approval gates, clear context/state boundaries. More tools mean more ways to go wrong and more context to reason over — if a human engineer can't say which tool a situation needs, the agent can't be expected to."
+            },
+            {
+                id: 4,
+                text: "In this module, what is a \"reusable engineering skill\"?",
+                options: [
+                    "A one-off prompt a developer keeps in a notes file",
+                    "A GitHub Copilot subscription tier",
+                    "The model's built-in knowledge of a programming language",
+                    "A versioned, owned package of specifications, instructions, heuristics, and agent behaviours that other projects can reuse"
+                ],
+                correct: 3,
+                explanation: "A skill is an asset: extracted from a proven workflow, versioned alongside code, with a named owner and a documented reuse/governance model — a spec validator, test-enhancement assistant, or PR reviewer. A personal prompt has none of those properties and does not transfer."
+            },
+            {
+                id: 5,
+                text: "The MCP-enabled workflow built in the lab chains tools across which sequence?",
+                options: [
+                    "Write code, then write the spec, then test",
+                    "Deploy → monitor → roll back",
+                    "Repository analysis → specification validation → test execution → result analysis / PR evidence collection",
+                    "Prompt → generate → accept"
+                ],
+                correct: 2,
+                explanation: "The lab has the agent move through a full engineering task using approved tools: understand the repo, validate the spec, run the tests against real infrastructure, then analyse the results and attach evidence to the PR — which is exactly what Module 08's quality gates then check."
+            }
+        ];
+
+        const PASS_MARK = 70;
+        const answers = {};
+        let submitted = false;
+
+        const form      = document.getElementById('quiz-form');
+        const container = document.getElementById('quiz-container');
+        const stats     = document.getElementById('quiz-stats');
+        const notice    = document.getElementById('quiz-notice');
+        const submitBtn = document.getElementById('submit-btn');
+        const resetBtn  = document.getElementById('reset-btn');
+
+        function esc(value) {
+            return String(value).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function renderQuiz() {
+            container.innerHTML = quizData.map(function (q, idx) {
+                const opts = q.options.map(function (opt, i) {
+                    return '<label class="option" data-q="' + q.id + '" data-i="' + i + '">' +
+                             '<input type="radio" name="q' + q.id + '" value="' + i + '">' +
+                             '<span class="marker"></span><span>' + esc(opt) + '</span>' +
+                           '</label>';
+                }).join('');
+
+                return '<fieldset class="question-card" data-q="' + q.id + '">' +
+                         '<legend class="question-number">Question ' + (idx + 1) + ' of ' + quizData.length + '</legend>' +
+                         '<p class="question-text">' + esc(q.text) + '</p>' +
+                         '<div class="options">' + opts + '</div>' +
+                         '<p class="feedback" id="fb-' + q.id + '" role="status" aria-live="polite" hidden></p>' +
+                       '</fieldset>';
+            }).join('');
+        }
+
+        container.addEventListener('change', function (e) {
+            if (submitted || e.target.type !== 'radio') return;
+            const label = e.target.closest('.option');
+            const qId = Number(label.dataset.q);
+
+            // Scoped to .option — .question-card and .quiz-dot carry the same
+            // data-q attribute and must not be caught by this query.
+            container.querySelectorAll('.option[data-q="' + qId + '"]')
+                     .forEach(function (el) { el.classList.remove('selected'); });
+
+            label.classList.add('selected');
+            answers[qId] = Number(label.dataset.i);
+            notice.hidden = true;
+            updateProgress();
+        });
+
+        // Before submission this shows the answered count ONLY. A running
+        // score here would let a learner cycle options and read off the
+        // answers without ever submitting.
+        function updateProgress() {
+            const answered = Object.keys(answers).length;
+
+            if (!submitted) {
+                // Only repaint the dots pre-submit. After grading they carry
+                // correct/incorrect, and resetting them here would wipe that.
+                document.querySelectorAll('.quiz-dot').forEach(function (dot) {
+                    dot.className = 'quiz-dot' + (answers[Number(dot.dataset.q)] !== undefined ? ' answered' : '');
+                });
+                stats.innerHTML = '<span>Answered: <strong>' + answered + '</strong>/' + quizData.length + '</span>';
+                return;
+            }
+
+            const correct = calcScore();
+            const pct = Math.round((correct / quizData.length) * 100);
+            stats.innerHTML =
+                '<span>Correct: <strong>' + correct + '</strong>/' + quizData.length + '</span>' +
+                '<span>Score: <strong>' + pct + '%</strong></span>' +
+                '<span>' + (pct >= PASS_MARK ? 'Passed' : 'Below ' + PASS_MARK + '% — review and retry') + '</span>';
+        }
+
+        function calcScore() {
+            return quizData.filter(function (q) { return answers[q.id] === q.correct; }).length;
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Inline message rather than alert(): alert() is suppressed in
+            // some embedded contexts and cannot be styled or announced.
+            const missing = quizData.find(function (q) { return answers[q.id] === undefined; });
+            if (missing) {
+                notice.textContent = 'Answer all ' + quizData.length + ' questions before submitting.';
+                notice.hidden = false;
+                const card = container.querySelector('.question-card[data-q="' + missing.id + '"]');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const input = card.querySelector('input');
+                if (input) input.focus();
+                return;
+            }
+
+            submitted = true;
+            notice.hidden = true;
+            submitBtn.disabled = true;
+
+            quizData.forEach(function (q) {
+                const card = container.querySelector('.question-card[data-q="' + q.id + '"]');
+                const wasCorrect = answers[q.id] === q.correct;
+
+                card.querySelectorAll('.option').forEach(function (opt) {
+                    const i = Number(opt.dataset.i);
+                    const input = opt.querySelector('input');
+                    if (input) input.disabled = true;
+                    opt.classList.add('locked');
+                    if (i === q.correct) opt.classList.add('correct');
+                    else if (answers[q.id] === i) opt.classList.add('incorrect');
+                });
+
+                const fb = document.getElementById('fb-' + q.id);
+                fb.textContent = (wasCorrect ? '✓ Correct. ' : '✗ Incorrect. ') + q.explanation;
+                fb.className = 'feedback ' + (wasCorrect ? 'correct' : 'incorrect');
+                fb.hidden = false;
+                card.classList.add(wasCorrect ? 'correct' : 'incorrect');
+
+                const dot = document.querySelector('.quiz-dot[data-q="' + q.id + '"]');
+                dot.className = 'quiz-dot ' + (wasCorrect ? 'correct' : 'incorrect');
+            });
+
+            updateProgress();
+        });
+
+        resetBtn.addEventListener('click', function () {
+            Object.keys(answers).forEach(function (k) { delete answers[k]; });
+            submitted = false;
+            submitBtn.disabled = false;
+            notice.hidden = true;
+            renderQuiz();
+            updateProgress();
+        });
+
+        // ── Init ───────────────────────────────────
+        renderQuiz();
+        updateProgress();
+    })();
+    </script>
+</body>
+</html>
