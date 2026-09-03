@@ -90,7 +90,7 @@ If you would rather not install anything globally, prefix every command with
 work:
 
 ```
-uvx --from git+https://github.com/github/spec-kit.git specify init --here --ai copilot --script sh
+uvx --from git+https://github.com/github/spec-kit.git specify init --here --integration copilot --script sh
 ```
 
 ---
@@ -103,18 +103,18 @@ For these labs the workspace root is `labs/module-01/`.
 
 ```bash
 cd labs/module-01
-specify init --here --ai copilot --script sh
+specify init --here --integration copilot --script sh
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
 cd labs\module-01
-specify init --here --ai copilot --script ps
+specify init --here --integration copilot --script ps
 ```
 
 To scaffold a **brand-new** project instead of an existing folder, replace
-`--here` with a name: `specify init my-project --ai copilot --script sh`.
+`--here` with a name: `specify init my-project --integration copilot --script sh`.
 
 ### Flags that matter
 
